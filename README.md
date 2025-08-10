@@ -72,10 +72,3 @@ A dynamic 4D visualization of the drone missions and detected conflicts.
 
 "Console Report":
 
-### Console Report
-
-The terminal output provides a detailed report of any detected conflicts, including the time and location.
-
-<p align="center">
-  <img src="docs/console_output_screenshot.png" alt="Conflict Report in Terminal" width="80%">
-</p>
