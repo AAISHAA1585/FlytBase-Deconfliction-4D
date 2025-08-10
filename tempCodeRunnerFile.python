@@ -1,0 +1,99 @@
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # enables 3d plotting
+from matplotlib.animation import FuncAnimation
+import numpy as np
+import os
+
+def animate_drones(primary_positions, others_positions_dict, conflicts, save_path=None):
+    """
+    Animate drones in 3D with conflict highlighting.
+    
+    Args:
+        primary_positions: list of (x,y,z) for primary drone
+        others_positions_dict: dict drone_id -> list of (x,y,z)
+        conflicts: dict drone_id -> list of (time, distance) tuples where conflict occurs
+        save_path: optional path to save GIF
+    """
+    primary_positions = np.array(primary_positions)
+    others_positions = {k: np.array(v) for k,v in others_positions_dict.items()}
+
+    max_len = max(len(primary_positions), max(len(pos) for pos in others_positions.values()))
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Set axis limits dynamically with padding
+    all_points = np.concatenate([primary_positions] + list(others_positions.values()), axis=0)
+    padding = 10
+    ax.set_xlim(np.min(all_points[:,0]) - padding, np.max(all_points[:,0]) + padding)
+    ax.set_ylim(np.min(all_points[:,1]) - padding, np.max(all_points[:,1]) + padding)
+    ax.set_zlim(np.min(all_points[:,2]) - padding, np.max(all_points[:,2]) + padding)
+
+    ax.set_xlabel("X position")
+    ax.set_ylabel("Y position")
+    ax.set_zlabel("Z position")
+    ax.set_title("Drone Conflict Visualization")
+
+    # Primary drone - blue
+    primary_point, = ax.plot([primary_positions[0,0]], [primary_positions[0,1]], [primary_positions[0,2]], 
+                             'bo', label='Primary', markersize=8)
+    primary_trail, = ax.plot([], [], [], 'b-', alpha=0.4)
+
+    # Other drones - green
+    other_points = {}
+    other_trails = {}
+    for drone_id, pos in others_positions.items():
+        p, = ax.plot([pos[0,0]], [pos[0,1]], [pos[0,2]], 'go', label=drone_id, markersize=6)
+        trail, = ax.plot([], [], [], 'g-', alpha=0.3)
+        other_points[drone_id] = p
+        other_trails[drone_id] = trail
+
+    # Conflict markers - red X
+    conflict_markers = {}
+    for drone_id in others_positions.keys():
+        c, = ax.plot([], [], [], 'rx', markersize=12, label='Conflict')
+        conflict_markers[drone_id] = c
+
+    ax.legend(loc='upper left')
+
+    # Prepare conflict times dict for quick lookup
+    conflict_times = {drone_id: set(t for t, _ in conflict_list) for drone_id, conflict_list in conflicts.items()}
+
+    trail_length = 30
+
+    def update(frame):
+        # Update primary drone
+        primary_point.set_data([primary_positions[frame,0]], [primary_positions[frame,1]])
+        primary_point.set_3d_properties([primary_positions[frame,2]])
+        start_idx = max(0, frame - trail_length)
+        primary_trail.set_data(primary_positions[start_idx:frame, 0], primary_positions[start_idx:frame, 1])
+        primary_trail.set_3d_properties(primary_positions[start_idx:frame, 2])
+
+        # Update others and conflicts
+        for drone_id, pos in others_positions.items():
+            if frame < len(pos):
+                other_points[drone_id].set_data([pos[frame,0]], [pos[frame,1]])
+                other_points[drone_id].set_3d_properties([pos[frame,2]])
+                start_idx = max(0, frame - trail_length)
+                other_trails[drone_id].set_data(pos[start_idx:frame, 0], pos[start_idx:frame, 1])
+                other_trails[drone_id].set_3d_properties(pos[start_idx:frame, 2])
+
+                # Show conflict marker if conflict at this time
+                if drone_id in conflict_times and frame in conflict_times[drone_id]:
+                    conflict_markers[drone_id].set_data([pos[frame,0]], [pos[frame,1]])
+                    conflict_markers[drone_id].set_3d_properties([pos[frame,2]])
+                else:
+                    conflict_markers[drone_id].set_data([], [])
+                    conflict_markers[drone_id].set_3d_properties([])
+
+        return [primary_point, primary_trail] + \
+               list(other_points.values()) + list(other_trails.values()) + \
+               list(conflict_markers.values())
+
+    ani = FuncAnimation(fig, update, frames=max_len, interval=50, blit=True)
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        ani.save(save_path, writer='pillow', fps=20)
+
+    plt.show()
