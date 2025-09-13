@@ -70,5 +70,5 @@ A dynamic 4D visualization of the drone missions and detected conflicts.
   <img src="demo/conflict_animation.gif" alt="4D Deconfliction Simulation">
 </p>
 
-"Console Report":
+
 
